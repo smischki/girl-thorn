@@ -1,0 +1,242 @@
+include prelude char video graphical_options
+
+--  frame type layout
+--               
+--    +---------+ horizontal
+--    :         :
+--    -----|----- -+
+--    -----|-----  | 
+--    -----|-----  |
+--    -----|-----  |
+--         *       | frame
+--    -----|-----  |
+--    -----|-----  |
+--    -----|-----  |
+--    -----|----- -+
+--
+--
+--  This is just a coordinate grid. The origin is 
+--  at the bottom left of the top right quadrant.
+--  the bottom half of the video are the 
+--  coordinates with negative Ys, the left halves
+--  of the horizontals are the coords with 
+--  negative Xs
+--  
+--  * is analogous to the frame data constructor
+--  and | is analogous to horizontal. - are the 
+--  grid_cells
+
+type frame contains
+    frame list horizontal list horizontal
+
+type horizontal contains
+    horizontal list grid_cell list grid_cell
+
+type grid_cell contains
+    full_grid_cell cell
+    empty_grid_cell
+    filter_grid_cell fn cell cell
+
+--  insert x y c inserts the cell c at the 
+--  coordinate x y
+
+let insert be the fn int fn int fn cell fn frame frame 
+    lambda x lambda y lambda chr
+        lambda frame col_neg col_pos match y 
+            case neg index    frame
+                insert_column x index chr col_neg
+                col_pos
+            case pos index    frame
+                col_neg
+                insert_column x succ index chr col_pos
+            case zero         frame
+                col_neg
+                insert_column x one chr col_pos
+
+--  Repeatedly apply a function to a frame n 
+--  times. Same be repeat
+
+let by be the fn nat fn fn frame frame fn frame frame repeat
+
+--  shift_by x y shifts the frame by the x and y 
+--  values
+
+let shift_by be the fn int fn int fn frame frame 
+    lambda x lambda y lambda f match 
+        the fn frame frame match x
+            case pos a     by a shift east
+            case neg a     by a shift west
+            case zero      identity
+        case fa    match 
+            the fn frame frame match y 
+                case pos a    by a shift north
+                case neg a    by a shift south
+                case zero     identity
+            case fb    fa fb f
+
+--  layer_frames a b layers a on top of b
+
+let layer_frames be the fn frame fn frame frame 
+    lambda frame na pa lambda frame nb pb   frame
+        layer_columns na nb
+        layer_columns pa pb
+
+let new_frame be the frame frame nil nil
+
+type direction contains
+    north
+    south
+    east
+    west
+
+--  shift d shifts the coordinates of the frame 
+--  in the direction d
+
+let shift be the fn direction fn frame frame 
+    lambda dir lambda bind f frame col_neg col_pos match dir
+        case north                match col_neg
+            case cons hor col_succ    frame
+                col_succ
+                cons hor col_pos
+            case nil                  frame
+                nil
+                cons empty_horizontal col_pos
+        case south                match col_pos
+            case cons hor col_succ    frame
+                cons hor col_neg
+                col_succ
+            case nil                  frame
+                cons empty_horizontal col_neg
+                nil
+        case east                 map_columns shift_horizontal right f
+        case west                 map_columns shift_horizontal left  f
+
+--  Essentially multiply all x coordinates by neg 
+--  one. this also flips some characters 
+--  horizontally.
+--
+--    (flip_over_y . flip_over_y) /= identity
+--
+--  because , flips to . but not vise versa
+
+let flip_over_y be the fn frame frame map_columns over_y_hor
+
+--  Recolor all the cells in a frame to a
+--  color
+
+let dye be the fn color fn frame frame lambda color map_frame 
+    lambda c match c 
+        case cell_space        cell_space
+        case cell ch _         cell ch color
+
+--  The following are helper functions you 
+--  probably don't need 
+
+let empty_horizontal be the horizontal 
+    horizontal nil nil
+
+let insert_horizontal be the fn int fn cell fn horizontal horizontal
+    lambda index lambda chr lambda horizontal n p
+        match index 
+            case neg index         horizontal insert_row index chr n p
+            case pos index         horizontal n insert_row succ index chr p
+            case zero              horizontal n insert_row one chr p
+
+let insert_row be the 
+    fn nat fn cell fn list grid_cell list grid_cell 
+    lambda index lambda chr lambda r match r 
+        case cons x xs         match index
+            case one               cons full_grid_cell chr xs
+            case succ i            cons x insert_row i chr xs
+        case nil               insert_row index chr cons empty_grid_cell nil
+
+let insert_column be the 
+    fn int fn nat fn cell fn list horizontal list horizontal 
+    lambda x lambda y lambda chr lambda col match col
+        case cons head tail    match y
+            case succ i            cons head insert_column x i chr tail
+            case one               cons insert_horizontal x chr head tail
+        case nil               insert_column x y chr cons empty_horizontal nil
+
+type horizontal_direction contains
+    right
+    left
+
+let shift_horizontal be the
+    fn horizontal_direction fn horizontal horizontal
+    lambda dir lambda horizontal r_l r_r match dir 
+        case right    match r_l 
+            case cons head tail     horizontal tail cons head r_r
+            case nil                horizontal nil cons empty_grid_cell r_r
+        case left     match r_r
+            case cons head tail     horizontal cons head r_l tail
+            case nil                horizontal cons empty_grid_cell r_l nil
+
+let map_columns be the fn fn horizontal horizontal fn frame frame 
+    lambda f lambda frame cn cp
+        frame
+            map_list f cn
+            map_list f cp
+
+let layer_columns be the 
+    fn list horizontal fn list horizontal list horizontal 
+    lambda ca lambda cb match tuple ca cb
+        case 
+            tuple cons head_a tail_a cons head_b tail_b   
+            cons
+                layer_horizontal head_a head_b
+                layer_columns tail_a tail_b
+        case either tuple nil a tuple a nil     a
+
+let layer_horizontal be the fn horizontal fn horizontal horizontal 
+    lambda horizontal aa ba lambda horizontal ab bb
+        horizontal
+            layer_rows aa ab
+            layer_rows ba bb
+
+let layer_rows be the 
+    fn list grid_cell fn list grid_cell list grid_cell
+    lambda x lambda b match tuple x b
+        case tuple cons aa ba cons ab bb        cons
+            match aa
+                case empty_grid_cell        ab
+                case full_grid_cell _       aa
+                case filter_grid_cell f     match ab
+                    case empty_grid_cell        filter_grid_cell f
+                    case full_grid_cell c       full_grid_cell f c
+                    case filter_grid_cell g     filter_grid_cell 
+                        lambda x f g x
+            layer_rows ba bb
+        case either tuple nil a tuple a nil     a
+
+let over_y_hor be the fn horizontal horizontal 
+    lambda horizontal n p match p
+        case cons x xs              horizontal 
+            map_row flip_over_y_char xs
+            cons map_over_grid_cell flip_over_y_char x
+                map_row flip_over_y_char n
+        case nil                    horizontal nil
+            cons empty_grid_cell map_row flip_over_y_char n
+
+let map_over_grid_cell be the
+    fn fn cell cell fn grid_cell grid_cell
+    lambda f lambda x match x 
+        case full_grid_cell a       full_grid_cell f a
+        case _                      x
+
+let map_horizontal be the
+    fn fn cell cell fn horizontal horizontal
+    lambda f lambda horizontal ra rb horizontal
+        map_row f ra
+        map_row f rb
+
+let map_frame be the fn fn cell cell fn frame frame 
+    lambda f lambda x map_columns map_horizontal f x
+
+let map_row be the 
+    fn fn cell cell fn list grid_cell list grid_cell 
+    lambda f lambda x match x
+        case nil                    nil
+        case cons head tail         cons
+            map_over_grid_cell f head 
+            map_row f tail

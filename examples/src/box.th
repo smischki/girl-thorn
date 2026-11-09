@@ -1,0 +1,19 @@
+include frame
+
+let draw_box be the fn nat fn nat frame
+    lambda x lambda y match 
+        the tuple horizontal horizontal tuple
+            horizontal_line_helper x
+                full_grid_cell cell hyphen_minus white 
+                cell plus_sign white
+            horizontal_line_helper x 
+                empty_grid_cell 
+                cell vertical_line white
+        case tuple border middle     frame nil 
+            cons border append border replicate nat_to_whole y middle
+    
+let horizontal_line_helper be the
+    fn nat fn grid_cell fn cell horizontal 
+    lambda x lambda c lambda b  horizontal nil cons 
+        full_grid_cell b 
+        append full_grid_cell b replicate nat_to_whole x c

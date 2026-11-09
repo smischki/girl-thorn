@@ -1,0 +1,50 @@
+include nat
+
+--  RGB colors found in terminals. note that
+--  black is not black but bright black (gray).
+--  the colors don't have bright/dark variants
+--  because many themes don't support them, and
+--  when they are supported, they're very
+--  inconsistent
+
+type color contains
+    black
+    red
+    green
+    yellow
+    blue
+    magenta
+    cyan
+    white
+
+--               red
+--             ________ 
+--            /\      /\   
+--   yellow  /  \____/  \  magenta
+--          /   /    \   \ 
+--         /___/      \___\
+--         \   \      /   /
+--          \   \____/   /  
+--    green  \  /    \  /  blue
+--            \/______\/
+--          
+--               cyan 
+--
+--  next_color is the next clock-wise color in
+--  this color wheel
+
+let next_color be the fn color color lambda x match x
+    case red                    magenta
+    case magenta                blue
+    case blue                   cyan
+    case cyan                   green
+    case green                  yellow
+    case yellow                 red
+    case either black white     x
+
+--  get the color on the opposite side of the 
+--  rgb color wheel. black and white are 
+--  uneffected
+
+let complementary be the fn color color repeat iii 
+    next_color
